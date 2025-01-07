@@ -1,0 +1,28 @@
+body {
+  font-family: "Source Code Pro", serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+button {
+  border-radius: 5px;
+  border: 1px solid #000;
+  padding: 8px 16px;
+  font-family: inherit;
+  background-color: #FFF;
+  cursor: pointer;
+}
+button:hover {
+  text-decoration: underline;
+}
+button:focus,
+button:focus-visible {
+  outline: 1px auto -webkit-focus-ring-color;
+}
+
+#app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px;
+}
