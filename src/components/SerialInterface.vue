@@ -6,6 +6,8 @@
       <button @click='onConnect' v-if='!port'>connect</button>
       <button @click='onDisconnect' v-if='port'>disconnect</button>
       <button @click='writeCommand("call:d")'>dump patch</button>
+      <button @click='writeCommand("call:m")'>free memory</button>
+      <button @click='onRestart'>restart</button>
       <button>load patch</button>
     </div>
 
@@ -78,6 +80,9 @@ const onConnect = async () => {
               })
 
               break;
+            case "m":
+              lines.value = ["free memory: " + m[2] + " bytes"];
+              break;
           }
         }
       }
@@ -91,6 +96,7 @@ const onConnect = async () => {
 }
 
 const onDisconnect = async () => {
+  window.location.reload();
   // TODO
   // streams are hard
   // 
@@ -98,6 +104,11 @@ const onDisconnect = async () => {
   // await port.value?.close()
   // port.value = undefined
   // currentDeviceStr.value = "none"
+}
+
+const onRestart = () => {
+  writeCommand("restart");
+  window.location.reload();
 }
 
 const writeCommand = async (command: string) => {
