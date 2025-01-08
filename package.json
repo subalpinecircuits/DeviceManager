@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.3",
+    "@types/crypto-js": "^4.2.2",
     "@types/w3c-web-serial": "^1.0.7",
+    "crypto-js": "^4.2.0",
+    "esptool-js": "^0.5.3",
     "vue": "^3.5.13"
   },
   "devDependencies": {

@@ -7,8 +7,11 @@
       <button @click='onDisconnect' v-if='port'>disconnect</button>
       <button @click='writeCommand("call:d")'>dump patch</button>
       <button @click='writeCommand("call:m")'>free memory</button>
+      <button @click='onInspect'>inspect patch</button>
       <button @click='onRestart'>restart</button>
       <button>load patch</button>
+      <input type='file' ref='file' @change='onFileSelect'>
+      <button @click='onFlash'>flash</button>
     </div>
 
     <ol>
@@ -24,6 +27,8 @@ import { ref } from 'vue';
 import { PresetSchema } from '../gen/Preset_pb.ts'
 import { fromBinary, type DescField } from '@bufbuild/protobuf'
 import { base64Decode } from "@bufbuild/protobuf/wire";
+import { ESPLoader, Transport, type LoaderOptions, type FlashOptions } from 'esptool-js'
+import * as CryptoJS from 'crypto-js'
 
 // see https://wicg.github.io/serial/
 class LineBreakTransformer {
@@ -49,6 +54,8 @@ const lines = ref<Array<string>>([])
 const currentDeviceStr = ref("none")
 const port = ref<SerialPort>()
 const closing = ref(false)
+
+const fileData = ref()
 
 const onConnect = async () => {
   port.value = await navigator.serial.requestPort();
@@ -109,6 +116,78 @@ const onDisconnect = async () => {
 const onRestart = () => {
   writeCommand("restart");
   window.location.reload();
+}
+
+const onInspect = () => {
+
+}
+
+// You can use any JavaScript compatible terminal by wrapping it in a helper object like this:
+let espLoaderTerminal = {
+  clean() {
+    // Implement the clean function call for your terminal here.
+  },
+  writeLine(data) {
+    // Implement the writeLine function call for your terminal here.
+  },
+  write(data) {
+    // Implement the write function call for your terminal here.
+  },
+};
+
+const onFileSelect = (e: Event) => {
+  if (!e.target) { return }
+
+  const input = (e.target as HTMLInputElement)
+
+  if (!input) { return }
+
+  const file = (input.files || [])[0]
+
+  if (!file) { return }
+
+  fileData.value = undefined;
+
+  const reader = new FileReader();
+
+  reader.onload = (ev: ProgressEvent<FileReader>) => {
+    fileData.value = ev.target?.result;
+  };
+
+  reader.readAsBinaryString(file);
+}
+
+const onFlash = async () => {
+  if (!port.value) { return }
+  const transport = new Transport(port.value, true);
+
+  const loaderOptions = {
+    transport,
+    baudrate: 115200,
+    terminal: espLoaderTerminal,
+    debugLogging: false,
+  } as LoaderOptions;
+
+  const esploader = new ESPLoader(loaderOptions);
+
+  const chip = await esploader.main();
+
+  console.log("chip: " + chip);
+
+  const flashOptions: FlashOptions = {
+    fileArray: [{ data: fileData.value as string, address: 0x10000 }],
+    flashSize: "keep",
+    eraseAll: false,
+    compress: true,
+    flashMode: 'DIO',
+    flashFreq: '80MHZ',
+    reportProgress: (fileIndex, written, total) => {
+      console.log(`written ${written} of total ${total}`)
+    },
+    calculateMD5Hash: (image: string) => CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)).toString(),
+  } as FlashOptions;
+
+  await esploader.writeFlash(flashOptions);
 }
 
 const writeCommand = async (command: string) => {
