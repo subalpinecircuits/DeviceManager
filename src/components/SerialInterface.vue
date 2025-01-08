@@ -158,12 +158,14 @@ const onFileSelect = (e: Event) => {
 }
 
 const onFlash = async () => {
-  if (!port.value) { return }
-  const transport = new Transport(port.value, true);
+  // if (!port.value) { return }
+
+  const device = await navigator.serial.requestPort({});
+  const transport = new Transport(device, true);
 
   const loaderOptions = {
     transport,
-    baudrate: 115200,
+    baudrate: 921600,
     terminal: espLoaderTerminal,
     debugLogging: false,
   } as LoaderOptions;
@@ -171,8 +173,6 @@ const onFlash = async () => {
   const esploader = new ESPLoader(loaderOptions);
 
   const chip = await esploader.main();
-
-  console.log("chip: " + chip);
 
   const flashOptions: FlashOptions = {
     fileArray: [{ data: fileData.value as string, address: 0x10000 }],
@@ -188,6 +188,8 @@ const onFlash = async () => {
   } as FlashOptions;
 
   await esploader.writeFlash(flashOptions);
+
+  alert('done')
 }
 
 const writeCommand = async (command: string) => {
