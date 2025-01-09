@@ -5,6 +5,13 @@ import SerialInterface from './components/SerialInterface.vue'
 <template>
   <h1>Device Manager</h1>
   <SerialInterface />
+  <a class="guide-link" href="https://subalpinecircuits.com/sa-01-beta-testing/" target="_blank">
+    beta testing user guide
+  </a>
 </template>
 
-<style scoped></style>
+<style scoped>
+a.guide-link {
+  margin-top: 10px;
+}
+</style>
