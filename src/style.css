@@ -1,24 +1,44 @@
-body {
+body,
+input {
   font-family: "Source Code Pro", serif;
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
 }
 
-button {
+button,
+.fake-button {
   border-radius: 5px;
   border: 1px solid #000;
   padding: 8px 16px;
   font-family: inherit;
   background-color: #FFF;
   cursor: pointer;
+  font-size: 13.3333px;
 }
-button:hover {
+button:not(:disabled):hover,
+.fake-button:hover {
   text-decoration: underline;
 }
-button:focus,
-button:focus-visible {
+button:not(:disabled):focus,
+button:not(:disabled):focus-visible,
+.fake-button:focus,
+.fake-button:focus-visible {
   outline: 1px auto -webkit-focus-ring-color;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+a {
+  color: #000;
+  display: inline-block;
+}
+a:hover,
+a:active,
+a:focus,
+a:focus-visible {
+  color: red;
 }
 
 #app {

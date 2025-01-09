@@ -5,13 +5,8 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
-<<<<<<< Updated upstream
-    hmr: false
-  }
-=======
     // hmr: false
   },
   base: "/DeviceManager/"
->>>>>>> Stashed changes
 })
 
