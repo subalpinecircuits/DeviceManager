@@ -2,11 +2,12 @@
   <div class='serial-interface'>
     <h3 v-if='page === "default"'>Select a mode</h3>
     <h3 v-if='page === "manage" || page === "patch"'>Current device: {{ currentDeviceStr }}</h3>
-    <h3 v-if='page === "program"'>Chip info: {{ currentChipInfo }}</h3>
+    <h3 v-if='page === "program" || page === "provision"'>Chip info: {{ currentChipInfo }}</h3>
 
     <div class='buttons' v-if='page === "default"'>
       <button @click='page = "manage"'>manage device</button>
       <button @click='page = "program"'>upload firmware</button>
+      <button @click='page = "provision"'>factory reset</button>
     </div>
 
     <div class='buttons' v-if='page === "manage"'>
@@ -25,7 +26,22 @@
       <label class='fake-button' for='upload-file'>
         {{ uploadFilename }}
       </label>
-      <button @click='onFlash'>flash</button>
+      <button @click='onFlash(false)' :disabled="uploadFilename === 'choose firmware'">flash</button>
+    </div>
+
+    <div class='buttons' v-if='page === "provision"'>
+      <button @click='page = "default"'>&lt;</button>
+      <input id='upload-file' style='display: none;' type='file' ref='file' @change='onFileSelect'>
+      <label class='fake-button' for='upload-file'>
+        {{ uploadFilename }}
+      </label>
+      <select v-model='boardRevision'>
+        <option disabled selected value=''>select board</option>
+        <option value='2'>rev 2</option>
+        <option value='3'>rev 3</option>
+      </select>
+      <button @click='onFlash(true)'
+        :disabled="boardRevision === '' || uploadFilename === 'choose firmware'">flash</button>
     </div>
 
     <div class='buttons' v-if='page === "patch"'>
@@ -50,6 +66,11 @@ import { fromBinary, type DescField } from '@bufbuild/protobuf'
 import { base64Decode } from "@bufbuild/protobuf/wire";
 import { ESPLoader, Transport, type LoaderOptions, type FlashOptions } from 'esptool-js'
 import * as CryptoJS from 'crypto-js'
+
+import bootloaderURL from '../assets/bootloader.bin'
+import partitionTableURL from '../assets/partition-table.bin'
+import nvs2URL from '../assets/nvs-2.bin'
+import nvs3URL from '../assets/nvs-3.bin'
 
 // see https://wicg.github.io/serial/
 class LineBreakTransformer {
@@ -82,7 +103,8 @@ const closing = ref(false)
 
 const fileData = ref()
 
-const uploadFilename = ref('select a file')
+const uploadFilename = ref('choose firmware')
+const boardRevision = ref('')
 
 const patchInput = ref('')
 const patchValid = ref(false)
@@ -225,8 +247,17 @@ const onFileSelect = (e: Event) => {
   reader.readAsBinaryString(file);
 }
 
-const onFlash = async () => {
+const blobToData = (blob: Blob) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.readAsBinaryString(blob)
+  })
+}
+
+const onFlash = async (provision: boolean) => {
   // if (!port.value) { return }
+  if (provision && boardRevision.value === '') { return }
 
   const device = await navigator.serial.requestPort({});
   const transport = new Transport(device, true);
@@ -242,8 +273,47 @@ const onFlash = async () => {
 
   currentChipInfo.value = await esploader.main();
 
+  const fileArray = [{ data: fileData.value as string, address: 0x10000 }]
+
+  if (provision) {
+    // bootloader
+    let resp = await fetch(bootloaderURL)
+    let blob = await resp.blob()
+    let data = await blobToData(blob)
+    fileArray.push({
+      data: data as string,
+      address: 0x0
+    })
+
+    // partition table
+    resp = await fetch(partitionTableURL)
+    blob = await resp.blob()
+    data = await blobToData(blob)
+    fileArray.push({
+      data: data as string,
+      address: 0x8000
+    })
+
+    // NVS partition
+    switch (boardRevision.value) {
+      case "2":
+        resp = await fetch(nvs2URL)
+        break;
+      case "3":
+        resp = await fetch(nvs3URL)
+        break;
+    }
+
+    blob = await resp.blob()
+    data = await blobToData(blob)
+    fileArray.push({
+      data: data as string,
+      address: 0x210000
+    })
+  }
+
   const flashOptions: FlashOptions = {
-    fileArray: [{ data: fileData.value as string, address: 0x10000 }],
+    fileArray,
     flashSize: "keep",
     eraseAll: false,
     compress: true,
@@ -299,6 +369,14 @@ const writeCommand = async (command: string) => {
 
   .patch-input {
     padding: 0 10px;
+  }
+
+  select {
+    font-family: inherit;
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: 1px solid #000;
+    padding: 8px 16px;
   }
 }
 </style>
