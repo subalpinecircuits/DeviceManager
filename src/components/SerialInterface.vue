@@ -6,7 +6,7 @@
 
     <div class='buttons' v-if='page === "default"'>
       <button @click='page = "manage"'>manage device</button>
-      <button @click='page = "program"'>upload firmware</button>
+      <button @click='page = "program"'>firmware update</button>
       <button @click='page = "provision"'>factory reset</button>
     </div>
 
@@ -22,26 +22,27 @@
 
     <div class='buttons' v-if='page === "program"'>
       <button @click='page = "default"'>&lt;</button>
-      <input id='upload-file' style='display: none;' type='file' ref='file' @change='onFileSelect'>
-      <label class='fake-button' for='upload-file'>
-        {{ uploadFilename }}
-      </label>
-      <button @click='onFlash(false)' :disabled="uploadFilename === 'choose firmware'">flash</button>
+      <select v-model='selectedFirmware'>
+        <option disabled selected value=''>select firmware</option>
+        <option v-for='release in releases' :key='release.id' :value='release.filename'>{{ release.tag }}
+          ({{ release.commit }})</option>
+      </select>
+      <button @click='onFlash(false)' :disabled="selectedFirmware === ''">flash</button>
     </div>
 
     <div class='buttons' v-if='page === "provision"'>
       <button @click='page = "default"'>&lt;</button>
-      <input id='upload-file' style='display: none;' type='file' ref='file' @change='onFileSelect'>
-      <label class='fake-button' for='upload-file'>
-        {{ uploadFilename }}
-      </label>
+      <select v-model='selectedFirmware'>
+        <option disabled selected value=''>select firmware</option>
+        <option v-for='release in releases' :key='release.id' :value='release.filename'>{{ release.tag }} ({{
+          release.commit }})</option>
+      </select>
       <select v-model='boardRevision'>
         <option disabled selected value=''>select board</option>
         <option value='2'>rev 2</option>
         <option value='3'>rev 3</option>
       </select>
-      <button @click='onFlash(true)'
-        :disabled="boardRevision === '' || uploadFilename === 'choose firmware'">flash</button>
+      <button @click='onFlash(true)' :disabled="boardRevision === '' || selectedFirmware === ''">flash</button>
     </div>
 
     <div class='buttons' v-if='page === "patch"'>
@@ -60,17 +61,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { ref, watchEffect, computed } from 'vue';
 import { PresetSchema } from '../gen/Preset_pb.ts'
 import { fromBinary, type DescField } from '@bufbuild/protobuf'
 import { base64Decode } from "@bufbuild/protobuf/wire";
 import { ESPLoader, Transport, type LoaderOptions, type FlashOptions } from 'esptool-js'
 import * as CryptoJS from 'crypto-js'
 
-import bootloaderURL from '../assets/bootloader.bin'
-import partitionTableURL from '../assets/partition-table.bin'
-import nvs2URL from '../assets/nvs-2.bin'
-import nvs3URL from '../assets/nvs-3.bin'
+import firmwareManifest from '../assets/firmware/manifest.json'
 
 // see https://wicg.github.io/serial/
 class LineBreakTransformer {
@@ -101,13 +99,18 @@ const currentChipInfo = ref("none")
 const port = ref<SerialPort>()
 const closing = ref(false)
 
-const fileData = ref()
-
-const uploadFilename = ref('choose firmware')
 const boardRevision = ref('')
+const selectedFirmware = ref('')
 
 const patchInput = ref('')
 const patchValid = ref(false)
+
+const releases = firmwareManifest.releases
+
+const firmwareUrl = computed(() => {
+  if (selectedFirmware.value === '') { return undefined }
+  return (new URL(`/src/assets/firmware/${selectedFirmware.value}`, import.meta.url)).href
+})
 
 watchEffect(() => {
   patchValid.value = false
@@ -223,30 +226,6 @@ let espLoaderTerminal = {
   },
 };
 
-const onFileSelect = (e: Event) => {
-  if (!e.target) { return }
-
-  const input = (e.target as HTMLInputElement)
-
-  if (!input) { return }
-
-  const file = (input.files || [])[0]
-
-  if (!file) { return }
-
-  uploadFilename.value = 'file: ' + file.name
-
-  fileData.value = undefined;
-
-  const reader = new FileReader();
-
-  reader.onload = (ev: ProgressEvent<FileReader>) => {
-    fileData.value = ev.target?.result;
-  };
-
-  reader.readAsBinaryString(file);
-}
-
 const blobToData = (blob: Blob) => {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -256,7 +235,7 @@ const blobToData = (blob: Blob) => {
 }
 
 const onFlash = async (provision: boolean) => {
-  // if (!port.value) { return }
+  if (!firmwareUrl.value) { return }
   if (provision && boardRevision.value === '') { return }
 
   const device = await navigator.serial.requestPort({});
@@ -273,19 +252,27 @@ const onFlash = async (provision: boolean) => {
 
   currentChipInfo.value = await esploader.main();
 
-  const fileArray = [{ data: fileData.value as string, address: 0x10000 }]
+  firmwareUrl
+
+  let resp = await fetch(firmwareUrl.value)
+  let blob = await resp.blob()
+  let data = await blobToData(blob)
+
+  const fileArray = [{ data: data as string, address: 0x10000 }]
 
   if (provision) {
     // bootloader
-    let resp = await fetch(bootloaderURL)
-    let blob = await resp.blob()
-    let data = await blobToData(blob)
+    const bootloaderURL = (new URL('/src/assets/bootloader.bin', import.meta.url)).href
+    resp = await fetch(bootloaderURL)
+    blob = await resp.blob()
+    data = await blobToData(blob)
     fileArray.push({
       data: data as string,
       address: 0x0
     })
 
     // partition table
+    const partitionTableURL = (new URL('/src/assets/partition-table.bin', import.meta.url)).href
     resp = await fetch(partitionTableURL)
     blob = await resp.blob()
     data = await blobToData(blob)
@@ -295,12 +282,13 @@ const onFlash = async (provision: boolean) => {
     })
 
     // NVS partition
+    const nvsURL = (new URL(`/src/assets/nvs-${boardRevision.value}.bin`, import.meta.url)).href
     switch (boardRevision.value) {
       case "2":
-        resp = await fetch(nvs2URL)
+        resp = await fetch(nvsURL)
         break;
       case "3":
-        resp = await fetch(nvs3URL)
+        resp = await fetch(nvsURL)
         break;
     }
 

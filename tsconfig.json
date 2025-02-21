@@ -6,5 +6,7 @@
   ],
   "compilerOptions": {
     "types": ["@types/w3c-web-serial"]
-  }
+  },
+  "moduleResolution": "node16",
+  "module": "node16"
 }
