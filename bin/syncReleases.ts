@@ -25,7 +25,7 @@ const releasesResponse = await octokit.request('GET /repos/subalpine-circuits/Sy
 await Promise.all(releasesResponse.data.map(async (d) => {
   const asset = d.assets[0]
 
-  const release = await octokit.request('GET /repos/subalpine-circuits/SynthEngine/releases/' + releasesResponse.data[0].id, {
+  const release = await octokit.request('GET /repos/subalpine-circuits/SynthEngine/releases/' + d.id, {
     owner: 'OWNER',
     repo: 'REPO',
     headers: {
@@ -59,7 +59,7 @@ await Promise.all(releasesResponse.data.map(async (d) => {
     console.error("failed to download firmware for release")
   }
 
-  manifest.releases.push({
+  manifest.releases.unshift({
     id: releasesResponse.data[0].id,
     tag: release.data.tag_name,
     filename: fileName,
