@@ -14,7 +14,7 @@ const octokit = new Octokit({
   auth: token
 })
 
-const releasesResponse = await octokit.request('GET /repos/subalpine-circuits/SynthEngine/releases', {
+const releasesResponse = await octokit.request('GET /repos/subalpinecircuits/SynthEngine/releases', {
   owner: 'OWNER',
   repo: 'REPO',
   headers: {
@@ -25,7 +25,7 @@ const releasesResponse = await octokit.request('GET /repos/subalpine-circuits/Sy
 await Promise.all(releasesResponse.data.map(async (d) => {
   const asset = d.assets[0]
 
-  const release = await octokit.request('GET /repos/subalpine-circuits/SynthEngine/releases/' + d.id, {
+  const release = await octokit.request('GET /repos/subalpinecircuits/SynthEngine/releases/' + d.id, {
     owner: 'OWNER',
     repo: 'REPO',
     headers: {
@@ -33,7 +33,7 @@ await Promise.all(releasesResponse.data.map(async (d) => {
     }
   })
 
-  const tagResp = await octokit.request('GET /repos/subalpine-circuits/SynthEngine/git/ref/tags/' + release.data.tag_name, {
+  const tagResp = await octokit.request('GET /repos/subalpinecircuits/SynthEngine/git/ref/tags/' + release.data.tag_name, {
     owner: 'OWNER',
     repo: 'REPO',
     headers: {
